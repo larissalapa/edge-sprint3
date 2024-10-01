@@ -1,0 +1,84 @@
+#include <Wire.h>
+#include <DHT.h>
+#include <math.h>
+ 
+const int MPU = 0x68;
+ 
+int16_t AccX, AccY, AccZ;
+int16_t GyroX, GyroY, GyroZ;
+float magnitudeAcc;
+float magnitudeGyro;
+ 
+#define SDA_PIN A4
+#define SCL_PIN A5
+ 
+#define DHTPIN 10
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+ 
+unsigned long previousMillis = 0;
+const long interval = 2000;
+ 
+float temperature, humidity;
+float totalAcc_kmh, gyro_rps;
+ 
+void setup() {
+  Serial.begin(9600);
+ 
+  Wire.begin();
+  Wire.beginTransmission(MPU);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
+ 
+  Wire.beginTransmission(MPU);
+  Wire.write(0x1C);
+  Wire.write(0x18);
+  Wire.endTransmission(true);
+ 
+  dht.begin();
+}
+ 
+void loop() {
+  Wire.beginTransmission(MPU);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU, 14, true);
+ 
+  if (Wire.available() == 14) {
+    AccX = Wire.read() << 8 | Wire.read();
+    AccY = Wire.read() << 8 | Wire.read();
+    AccZ = Wire.read() << 8 | Wire.read();
+    GyroX = Wire.read() << 8 | Wire.read();
+    GyroY = Wire.read() << 8 | Wire.read();
+    GyroZ = Wire.read() << 8 | Wire.read();
+ 
+    magnitudeAcc = sqrt(pow(AccX, 2) + pow(AccY, 2) + pow(AccZ, 2));
+    magnitudeGyro = sqrt(pow(GyroX, 2) + pow(GyroY, 2) + pow(GyroZ, 2));
+ 
+    temperature = dht.readTemperature();
+    humidity = dht.readHumidity();
+ 
+    totalAcc_kmh = (magnitudeAcc / 16384.0) * 9.81 * 3.6;
+    gyro_rps = magnitudeGyro / 180.0;
+ 
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousMillis >= interval) {
+      previousMillis = currentMillis;
+     
+      Serial.print("Temperatura: ");
+      Serial.print(temperature);
+      Serial.print(" °C, Umidade: ");
+      Serial.print(humidity);
+      Serial.print(" %, Aceleração: ");
+      Serial.print(totalAcc_kmh, 1);
+      Serial.print(" km/h, Rotação: ");
+      Serial.print(gyro_rps, 1);
+      Serial.println(" giro/s");
+    }
+  } else {
+    Serial.println("Erro ao ler os dados do acelerômetro");
+  }
+ 
+  delay(100);
+}
